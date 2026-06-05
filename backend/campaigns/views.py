@@ -148,6 +148,7 @@ class SequenceStepViewSet(viewsets.ModelViewSet):
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.conf import settings as django_settings
+from pathlib import Path
 
 class WebhookView(APIView):
     """
@@ -422,3 +423,53 @@ class AIGenerateView(APIView):
             "Your Name"
         )
         return f"SUBJECT: {subject}\nBODY: {body}"
+    
+from django.http import HttpResponse
+from pathlib import Path
+from leads.models import Lead
+from .utils import verify_unsubscribe_token
+
+def unsubscribe_view(request, lead_id, token):
+    """Public unsubscribe endpoint for GDPR/CAN-SPAM compliance."""
+    verified = verify_unsubscribe_token(token)
+
+    if not verified or str(verified) != str(lead_id):
+        return HttpResponse(
+            "Invalid unsubscribe link",
+            status=400,
+        )
+
+    try:
+        lead = Lead.objects.get(id=lead_id)
+    except Lead.DoesNotExist:
+        return HttpResponse(
+            "Lead not found",
+            status=404,
+        )
+
+    lead.global_unsubscribe = True
+    lead.save(update_fields=["global_unsubscribe"])
+
+    confirmation_path = Path(__file__).resolve().parents[2] / 'frontend' / 'unsubscribe.html'
+    if confirmation_path.exists():
+        html = confirmation_path.read_text(encoding='utf-8')
+    else:
+        html = (
+            '<!DOCTYPE html>'
+            '<html lang="en">'
+            '<head>'
+            '<meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>Unsubscribed | LeadOrbit</title>'
+            '<style>body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Ubuntu,sans-serif;background:#f8fafc;color:#111827;}'
+            '.container{max-width:720px;margin:72px auto;padding:32px;background:#ffffff;border:1px solid #e5e7eb;border-radius:24px;box-shadow:0 20px 80px rgba(15,23,42,.08);}'
+            'h1{margin-top:0;font-size:2rem;color:#0f172a;}p{font-size:1rem;line-height:1.7;color:#475569;}a{color:#2563eb;text-decoration:none;}</style>'
+            '</head>'
+            '<body><div class="container"><h1>Unsubscribed</h1>'
+            '<p>You have been unsubscribed from all future emails sent through LeadOrbit.</p>'
+            '<p>If you received this link by mistake, no further action is needed.</p>'
+            '</div></body>'
+            '</html>'
+        )
+
+    return HttpResponse(html, content_type='text/html')
