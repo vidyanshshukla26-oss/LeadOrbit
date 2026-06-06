@@ -91,3 +91,156 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+// ==========================================
+// KEYBOARD SHORTCUTS IMPLEMENTATION (#67)
+// ==========================================
+
+/**
+ * Dynamically injects the Bootstrap shortcuts modal and the footer trigger link into the DOM
+ */
+function injectShortcutsModal() {
+    // 1. Inject the Modal at the end of the body if it isn't there already
+    if (!document.getElementById('shortcutsHelpModal')) {
+        const modalHTML = `
+            <div class="modal fade" id="shortcutsHelpModal" tabindex="-1" aria-labelledby="shortcutsHelpModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="shortcutsHelpModalLabel">⌨️ Keyboard Shortcuts</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <table class="table table-borderless align-middle mb-0">
+                                <thead>
+                                    <tr class="border-bottom">
+                                        <th>Shortcut</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><kbd>Alt + D</kbd></td><td>Navigate to Dashboard</td></tr>
+                                    <tr><td><kbd>Alt + L</kbd></td><td>Navigate to Leads</td></tr>
+                                    <tr><td><kbd>Alt + C</kbd></td><td>Navigate to Campaigns</td></tr>
+                                    <tr><td><kbd>Alt + A</kbd></td><td>Navigate to Analytics</td></tr>
+                                    <tr><td><kbd>Alt + S</kbd></td><td>Navigate to Settings</td></tr>
+                                    <tr><td><kbd>Alt + N</kbd></td><td>New Campaign Builder</td></tr>
+                                    <tr><td><kbd>?</kbd></td><td>Show this help menu</td></tr>
+                                    <tr><td><kbd>/</kbd></td><td>Focus search bar</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    }
+
+    // 2. Inject a neat text link in the Sidebar Footer area (with robust fallback selectors)
+    const sidebarFooter = document.querySelector('.sidebar-footer') || 
+                          document.querySelector('aside .small') || 
+                          document.querySelector('aside');
+                          
+    if (sidebarFooter) {
+        if (!document.getElementById('shortcut-trigger-btn')) {
+            const linkHTML = `
+                <div class="mt-2 pt-2 border-top border-secondary border-opacity-25" id="shortcut-link-wrapper">
+                    <a href="#" id="shortcut-trigger-btn" class="text-white opacity-50 text-decoration-none small" title="Show Keyboard Shortcuts">
+                        <i class="bi bi-keyboard me-1"></i> Shortcuts <kbd class="bg-dark text-white border-secondary">?</kbd>
+                    </a>
+                </div>
+            `;
+            // Insert it right at the top inside the sidebar footer container
+            sidebarFooter.insertAdjacentHTML('afterbegin', linkHTML);
+
+            // Add click listener to open the modal via the UI link
+            document.getElementById('shortcut-trigger-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                const modalEl = document.getElementById('shortcutsHelpModal');
+                if (modalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            });
+        }
+    } else {
+        // Fallback: If the sidebar element isn't painted yet, retry in 100ms
+        setTimeout(injectShortcutsModal, 100);
+    }
+}
+/**
+ * Initializes global event listener for keyboard navigation
+ */
+
+function initKeyboardShortcuts() {
+    // Only track shortcuts on authenticated pages (skip login/register)
+    if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
+        return;
+    }
+
+    // Run the DOM injection immediately
+    injectShortcutsModal();
+
+    // Backup injection: If elements were slow to render, try again in a split second
+    setTimeout(injectShortcutsModal, 200);
+
+    document.addEventListener('keydown', (event) => {
+        // Guard Check: Ignore shortcuts if typing in input, textarea, or editable element
+        const activeEl = document.activeElement;
+        if (activeEl && (
+            activeEl.tagName === 'INPUT' || 
+            activeEl.tagName === 'TEXTAREA' || 
+            activeEl.isContentEditable
+        )) {
+            return;
+        }
+
+        // Handle "?" key for Help Modal
+        if (event.key === '?') {
+            event.preventDefault();
+            const modalEl = document.getElementById('shortcutsHelpModal');
+            if (modalEl && window.bootstrap) {
+                const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modalInstance.show();
+            }
+            return;
+        }
+        // Handle "/" key to focus the search input if it exists
+        if (event.key === '/') {
+            // Find an input field that looks like a search bar
+            const searchInput = document.querySelector('input[type="search"]') || 
+                                document.querySelector('input[placeholder*="Search"]') ||
+                                document.querySelector('.search-box input');
+            
+            if (searchInput) {
+                event.preventDefault(); // Prevent typing the "/" character into the box
+                searchInput.focus();
+                searchInput.select();   // Optional: highlights text if they already typed something
+            }
+            return;
+        }
+
+        // Handle "Alt" combinations
+        if (event.altKey) {
+            let targetPage = '';
+            switch (event.key.toLowerCase()) {
+                case 'd': targetPage = 'dashboard.html'; break;
+                case 'l': targetPage = 'leads.html'; break;
+                case 'c': targetPage = 'campaigns.html'; break;
+                case 'a': targetPage = 'analytics.html'; break;
+                case 's': targetPage = 'settings.html'; break;
+                case 'n': targetPage = 'campaign-builder.html'; break;
+                default: return; // Exit if unmapped alt key
+            }
+            event.preventDefault();
+            window.location.href = targetPage;
+        }
+    });
+}
+// Safely execute shortcut setup inside the DOMContentLoaded cycle
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
+} else {
+    initKeyboardShortcuts();
+}
+
