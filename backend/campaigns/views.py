@@ -133,6 +133,61 @@ class CampaignViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        campaign = self.get_object()
+
+        if campaign.status != 'ACTIVE':
+            return Response(
+                {
+                    "error": "Only active campaigns can be paused.",
+                    "campaign_id": str(campaign.id),
+                    "status": campaign.status,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        campaign.status = 'PAUSED'
+        campaign.save(update_fields=['status'])
+
+        return Response(
+            {
+                "message": "Campaign paused.",
+                "campaign_id": str(campaign.id),
+                "status": campaign.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        from .tasks import process_active_leads
+
+        campaign = self.get_object()
+
+        if campaign.status != 'PAUSED':
+            return Response(
+                {
+                    "error": "Only paused campaigns can be resumed.",
+                    "campaign_id": str(campaign.id),
+                    "status": campaign.status,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        campaign.status = 'ACTIVE'
+        campaign.save(update_fields=['status'])
+        process_active_leads.delay()
+
+        return Response(
+            {
+                "message": "Campaign resumed. Processing queue triggered.",
+                "campaign_id": str(campaign.id),
+                "status": campaign.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class SequenceStepViewSet(viewsets.ModelViewSet):
     serializer_class = SequenceStepSerializer
     queryset = SequenceStep.objects.all()

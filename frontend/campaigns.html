@@ -273,9 +273,18 @@
                     ? previewSteps.map(label => `<span class="step-chip"><i class="bi bi-dot"></i>${escapeHtml(label)}</span>`).join('')
                     : '<span class="text-muted small">No sequence steps configured</span>';
 
-                const toggleTarget = status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-                const toggleLabel = status === 'ACTIVE' ? 'Pause' : 'Activate';
-                const toggleIcon = status === 'ACTIVE' ? 'bi-pause-circle' : 'bi-play-circle';
+                const actionDetails = {
+                    ACTIVE: { endpoint: 'pause', nextStatus: 'PAUSED', label: 'Pause', icon: 'bi-pause-circle' },
+                    PAUSED: { endpoint: 'resume', nextStatus: 'ACTIVE', label: 'Resume', icon: 'bi-play-circle' },
+                    DRAFT: { endpoint: 'launch', nextStatus: 'ACTIVE', label: 'Launch', icon: 'bi-rocket-takeoff' },
+                }[status];
+                const actionButton = actionDetails ? `
+                                    <button class="btn btn-sm btn-outline-success"
+                                        data-action-id="${campaign.id}"
+                                        data-action-endpoint="${actionDetails.endpoint}"
+                                        data-next-status="${actionDetails.nextStatus}">
+                                        <i class="bi ${actionDetails.icon} me-1"></i>${actionDetails.label}
+                                    </button>` : '';
 
                 return `
                     <div class="col-12 col-md-6 col-xl-4">
@@ -311,31 +320,26 @@
                                     <a href="/campaign-builder.html?id=${campaign.id}" class="btn btn-sm btn-outline-primary flex-grow-1">
                                         <i class="bi bi-pencil me-1"></i> Edit
                                     </a>
-                                    <button class="btn btn-sm btn-outline-success"
-                                        data-toggle-id="${campaign.id}"
-                                        data-current-status="${status}"
-                                        data-toggle-target="${toggleTarget}">
-                                        <i class="bi ${toggleIcon} me-1"></i>${toggleLabel}
-                                    </button>
+                                    ${actionButton}
                                 </div>
                             </div>
                         </div>
                     </div>`;
             }).join('');
 
-            grid.querySelectorAll('[data-toggle-id]').forEach(button => {
+            grid.querySelectorAll('[data-action-id]').forEach(button => {
                 button.addEventListener('click', async () => {
-                    const campaignId = button.dataset.toggleId;
-                    const nextStatus = button.dataset.toggleTarget;
+                    const campaignId = button.dataset.actionId;
+                    const endpoint = button.dataset.actionEndpoint;
+                    const nextStatus = button.dataset.nextStatus;
                     const originalLabel = button.innerHTML;
 
                     button.disabled = true;
                     button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating';
 
                     try {
-                        const res = await fetchWithAuth(`/campaigns/${campaignId}/`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ status: nextStatus }),
+                        const res = await fetchWithAuth(`/campaigns/${campaignId}/${endpoint}/`, {
+                            method: 'POST',
                         });
 
                         if (!res.ok) {

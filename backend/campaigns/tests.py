@@ -942,6 +942,63 @@ class CampaignWorkflowTests(APITestCase):
         response = self.client.post(f'/api/v1/campaigns/{campaign.id}/launch/', {}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_pause_action_pauses_active_campaign(self):
+        campaign = Campaign.objects.create(
+            organization=self.organization,
+            name='Pause active campaign',
+            status='ACTIVE',
+        )
+
+        response = self.client.post(f'/api/v1/campaigns/{campaign.id}/pause/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.status, 'PAUSED')
+        self.assertEqual(response.data['status'], 'PAUSED')
+
+    def test_pause_rejects_non_active_campaign(self):
+        campaign = Campaign.objects.create(
+            organization=self.organization,
+            name='Pause draft campaign',
+            status='DRAFT',
+        )
+
+        response = self.client.post(f'/api/v1/campaigns/{campaign.id}/pause/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.status, 'DRAFT')
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_resume_action_activates_paused_campaign_and_triggers_processing(self):
+        campaign = Campaign.objects.create(
+            organization=self.organization,
+            name='Resume paused campaign',
+            status='PAUSED',
+        )
+
+        with patch('campaigns.tasks.process_active_leads.delay') as mocked_delay:
+            response = self.client.post(f'/api/v1/campaigns/{campaign.id}/resume/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.status, 'ACTIVE')
+        self.assertEqual(response.data['status'], 'ACTIVE')
+        mocked_delay.assert_called_once()
+
+    def test_resume_rejects_non_paused_campaign(self):
+        campaign = Campaign.objects.create(
+            organization=self.organization,
+            name='Resume active campaign',
+            status='ACTIVE',
+        )
+
+        response = self.client.post(f'/api/v1/campaigns/{campaign.id}/resume/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.status, 'ACTIVE')
+
     def test_condition_time_is_mapped_to_delay_minutes(self):
         payload = {
             'name': 'Condition delay mapping',
