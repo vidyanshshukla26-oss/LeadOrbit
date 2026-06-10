@@ -1067,6 +1067,67 @@
         </div>
     </div>
 
+    <!-- Campaign Settings Modal -->
+<div class="modal fade" id="campaignSettingsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Campaign Settings</h5>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="setting-stop-reply"
+                 checked>
+          <label class="form-check-label">
+            Stop on Reply
+          </label>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="setting-track-opens"
+                 checked>
+          <label class="form-check-label">
+            Track Email Opens
+          </label>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="setting-track-clicks"
+                 checked>
+          <label class="form-check-label">
+            Track Link Clicks
+          </label>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">
+            Daily Sending Limit
+          </label>
+
+          <input type="number"
+                 class="form-control"
+                 id="setting-daily-limit"
+                 value="100">
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
     <script type="module" src="/main.js"></script>
     <script type="module">
         import { fetchWithAuth } from '/api.js?v=20260311b';
@@ -1363,7 +1424,22 @@
 
         async function saveCampaign() {
             const name = document.getElementById('campaign-name').value;
-            const settings = { steps: steps.map((s, i) => ({ ...s, step_order: i + 1 })) };
+            // const settings = { steps: steps.map((s, i) => ({ ...s, step_order: i + 1 })) };
+            const settings = {
+    steps: steps.map((s, i) => ({ ...s, step_order: i + 1 })),
+
+    stop_on_reply:
+        document.getElementById('setting-stop-reply').checked,
+
+    track_opens:
+        document.getElementById('setting-track-opens').checked,
+
+    track_clicks:
+        document.getElementById('setting-track-clicks').checked,
+
+    daily_limit:
+        parseInt(document.getElementById('setting-daily-limit').value) || 100
+};
             const isActive = document.getElementById('status-toggle').classList.contains('on');
             const payload = {
                 name,
@@ -2252,6 +2328,12 @@
 
         // â”€â”€â”€ INIT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('settings-icon').addEventListener('click', () => {
+    const modal = new bootstrap.Modal(
+        document.getElementById('campaignSettingsModal')
+    );
+    modal.show();
+});
             // Load connected accounts
             try {
                 const res = await fetchWithAuth('/connected-accounts/');
@@ -2285,6 +2367,20 @@
                         if (data.settings && data.settings.steps) {
                             steps = data.settings.steps;
                         }
+
+                        const settings = data.settings || {};
+
+document.getElementById('setting-stop-reply').checked =
+    settings.stop_on_reply ?? true;
+
+document.getElementById('setting-track-opens').checked =
+    settings.track_opens ?? true;
+
+document.getElementById('setting-track-clicks').checked =
+    settings.track_clicks ?? true;
+
+document.getElementById('setting-daily-limit').value =
+    settings.daily_limit ?? 100;
                     }
                 } catch (e) { console.error(e); }
             }
