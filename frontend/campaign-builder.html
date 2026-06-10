@@ -1686,6 +1686,18 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="mb-3">
+                    <div class="ep-label">Insert Tag</div>
+                        <select class="ep-input" id="merge-tag-select">
+                            <option value="">Select a merge tag</option>
+                            <option value="{{firstName}}">{{firstName}}</option>
+                            <option value="{{lastName}}">{{lastName}}</option>
+                            <option value="{{email}}">{{email}}</option>
+                            <option value="{{company}}">{{company}}</option>
+                            <option value="{{icebreaker}}">{{icebreaker}}</option>
+                        </select>
+                </div>
                 <div class="mb-3">
                     <div class="ep-label">Subject <span class="text-muted fw-normal">&middot; Add Cc</span></div>
                     <input type="text" class="ep-input" id="ep-subject" placeholder="Subject" value="${step.subject || ''}">
@@ -1721,6 +1733,47 @@
             // Bind inputs
             document.getElementById('ep-subject').addEventListener('input', (e) => { step.subject = e.target.value; });
             document.getElementById('ep-body').addEventListener('input', (e) => { step.body = e.target.value; });
+
+            let activeEditor = document.getElementById('ep-body');
+
+            document.getElementById('ep-subject').addEventListener('focus', () => {
+                activeEditor = document.getElementById('ep-subject');
+            });
+
+            document.getElementById('ep-body').addEventListener('focus', () => {
+                activeEditor = document.getElementById('ep-body');
+            });
+
+
+
+            const mergeSelect = document.getElementById('merge-tag-select');
+
+            mergeSelect.addEventListener('change', (e) => {
+                const tagText = e.target.value;
+                if (!tagText) return;
+
+            const body = activeEditor;
+
+            const start = body.selectionStart;
+            const end = body.selectionEnd;
+
+            body.value =
+                body.value.substring(0, start) +
+                tagText +
+                body.value.substring(end);
+
+            if (body.id === 'ep-subject') {
+                step.subject = body.value;
+            } else {
+                step.body = body.value;
+            }
+
+            body.focus();
+            body.selectionStart = body.selectionEnd =
+                start + tagText.length;
+
+            mergeSelect.value = '';
+        });
             const senderSelect = document.getElementById('sender-account-select');
             if (senderSelect) {
                 senderSelect.addEventListener('change', (e) => {
