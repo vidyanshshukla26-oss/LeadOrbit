@@ -15,7 +15,7 @@ from campaigns.tasks import (
     send_email_step,
 )
 from campaigns.utils import generate_unsubscribe_token
-from leads.models import Lead
+from leads.models import BlockedDomain, Lead
 from tenants.models import Organization
 from users.models import User
 
@@ -1200,3 +1200,55 @@ class CampaignWorkflowTests(APITestCase):
         self.assertEqual(campaign_lead.status, 'FINISHED')
         self.assertIsNone(campaign_lead.current_step)
         self.assertIsNone(campaign_lead.next_execution_time)
+
+    def test_send_email_step_skips_blocked_domain_leads(self):
+        BlockedDomain.objects.create(
+            organization=self.organization,
+            domain='blocked.test',
+        )
+        account = ConnectedEmailAccount.objects.create(
+            organization=self.organization,
+            connected_by=self.user,
+            email_address='sender@acme.test',
+            provider='GOOGLE',
+            access_token='token',
+            refresh_token='refresh',
+        )
+        campaign = Campaign.objects.create(
+            organization=self.organization,
+            name='Blocked domain skip test',
+            status='ACTIVE',
+            connected_account=account,
+        )
+        email_step = SequenceStep.objects.create(
+            organization=self.organization,
+            campaign=campaign,
+            step_order=1,
+            channel_type='EMAIL',
+            delay_minutes=0,
+            template_subject='Hello',
+            template_body='Hi there',
+        )
+        lead = Lead.objects.create(
+            organization=self.organization,
+            email='lead@sub.blocked.test',
+        )
+        campaign_lead = CampaignLead.objects.create(
+            organization=self.organization,
+            campaign=campaign,
+            lead=lead,
+            current_step=email_step,
+            status='ACTIVE',
+            next_execution_time=timezone.now() - timedelta(minutes=1),
+        )
+
+        with patch('campaigns.tasks.send_gmail') as mocked_send:
+            send_email_step(campaign_lead.id, email_step.id)
+
+        campaign_lead.refresh_from_db()
+        campaign.refresh_from_db()
+        self.assertEqual(campaign_lead.status, 'SKIPPED')
+        self.assertIsNone(campaign_lead.current_step)
+        self.assertIsNone(campaign_lead.next_execution_time)
+        self.assertEqual(campaign.status, 'COMPLETED')
+        mocked_send.assert_not_called()

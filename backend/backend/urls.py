@@ -10,7 +10,7 @@ class CustomTokenObtainPairView(BaseTokenObtainPairView):
     serializer_class = CustomTokenObtainSerializer
 
 from users.views import AuthViewSet
-from leads.views import LeadViewSet, TagViewSet
+from leads.views import BlockedDomainViewSet, LeadViewSet, TagViewSet
 from campaigns.views import (
     CampaignViewSet,
     SequenceStepViewSet,
@@ -33,6 +33,7 @@ router = DefaultRouter()
 router.register(r'auth', AuthViewSet, basename='auth')
 router.register(r'leads', LeadViewSet, basename='leads')
 router.register(r'tags', TagViewSet, basename='tags')
+router.register(r'blocked-domains', BlockedDomainViewSet, basename='blocked-domains')
 router.register(r'campaigns', CampaignViewSet, basename='campaigns')
 
 urlpatterns = [

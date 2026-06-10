@@ -1,6 +1,26 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from tenants.models import TenantModel
 import uuid
+import re
+
+DOMAIN_PATTERN = re.compile(r'^(?!-)[a-z0-9-]+(?:\.[a-z0-9-]+)+$')
+
+
+def normalize_domain(value):
+    domain = (value or '').strip().lower()
+    domain = re.sub(r'^https?://', '', domain)
+    if '@' in domain:
+        domain = domain.rsplit('@', 1)[-1]
+    domain = domain.split('/', 1)[0].split(':', 1)[0].strip('.')
+    return domain
+
+
+def validate_domain(value):
+    domain = normalize_domain(value)
+    if not domain or not DOMAIN_PATTERN.match(domain):
+        raise ValidationError('Enter a valid domain, for example competitor.com.')
+    return domain
 
 class Lead(TenantModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -37,3 +57,20 @@ class LeadTag(TenantModel):
 
     class Meta:
         unique_together = ('lead', 'tag')
+
+class BlockedDomain(TenantModel):
+    domain = models.CharField(max_length=255)
+
+    class Meta:
+        unique_together = ('organization', 'domain')
+        ordering = ['domain']
+
+    def clean(self):
+        self.domain = validate_domain(self.domain)
+
+    def save(self, *args, **kwargs):
+        self.domain = validate_domain(self.domain)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.domain

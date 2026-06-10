@@ -76,6 +76,7 @@ class CampaignLead(TenantModel):
         ('PAUSED', 'Paused'),
         ('REPLIED', 'Replied'),
         ('BOUNCED', 'Bounced'),
+        ('SKIPPED', 'Skipped'),
         ('FINISHED', 'Finished')
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
