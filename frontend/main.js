@@ -168,17 +168,19 @@ applyTheme(getTheme());
 // ==========================================
 // ACTIVE NAVIGATION LINK
 // ==========================================
-
 function setActiveNavLink() {
     const pathname = window.location.pathname;
     const navLinks = document.querySelectorAll('.nav-link');
-    
+
     if (navLinks.length === 0) return;
-    
-    navLinks.forEach(link => link.classList.remove('active'));
-    
+
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        link.removeAttribute('aria-current');
+    });
+
     let activeHref = '/dashboard.html';
-    
+
     if (/campaign-builder\.html/i.test(pathname)) {
         activeHref = '/campaigns.html';
     } else if (/dashboard\.html/i.test(pathname)) {
@@ -192,10 +194,11 @@ function setActiveNavLink() {
     } else if (/settings\.html/i.test(pathname)) {
         activeHref = '/settings.html';
     }
-    
+
     const activeLink = document.querySelector(`a.nav-link[href="${activeHref}"]`);
     if (activeLink) {
         activeLink.classList.add('active');
+        activeLink.setAttribute('aria-current', 'page');
     }
 }
 
