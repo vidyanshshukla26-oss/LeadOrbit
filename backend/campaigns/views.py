@@ -97,7 +97,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
             except ConnectedEmailAccount.DoesNotExist:
                 return Response(
                     {
-                        "error": "Connected email account not found. Please reconnect your Gmail account in Settings.",
+                        "error": "Connected email account not found. Please reconnect your sender account in Settings.",
                         "campaign_id": str(campaign.id),
                     },
                     status=status.HTTP_400_BAD_REQUEST,
@@ -124,7 +124,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
                 return Response(
                     {
                         "error": "Selected sender account belongs to another user. "
-                                 "Choose your own connected Gmail account before launch.",
+                                 "Choose your own connected email account before launch.",
                         "campaign_id": str(campaign.id),
                     },
                     status=status.HTTP_400_BAD_REQUEST,
@@ -416,10 +416,14 @@ class WebhookView(APIView):
         # Simple MVP tracking
         if event_type and lead_email:
             try:
+                tracked_statuses = ['ACTIVE', 'ENROLLED']
+                if event_type in {'bounce', 'reply'} and message_id:
+                    tracked_statuses.append('FINISHED')
+
                 # Find active campaign lead matching this email
                 base_qs = CampaignLead.objects.filter(
                     lead__email=lead_email,
-                    status__in=['ACTIVE', 'ENROLLED'],
+                    status__in=tracked_statuses,
                 )
                 if message_id:
                     base_qs = base_qs.filter(last_sent_message_id=message_id)
@@ -431,29 +435,17 @@ class WebhookView(APIView):
                     _execute_condition_click_step,
                     _execute_condition_open_step,
                     _execute_condition_reply_step,
+                    _mark_campaign_lead_bounced,
                 )
 
                 for cl in cleads:
                     if event_type == 'bounce':
-                        cl.status = 'BOUNCED'
-                        if bounce_details['bounce_type']:
-                            cl.bounce_type = bounce_details['bounce_type']
-                        if bounce_details['bounce_code']:
-                            cl.bounce_code = bounce_details['bounce_code']
-                        if bounce_details['bounce_reason']:
-                            cl.bounce_reason = bounce_details['bounce_reason']
-                        cl.save(update_fields=[
-                            'status',
-                            'bounce_type',
-                            'bounce_code',
-                            'bounce_reason',
-                        ])
-                        logger.info(
-                            'Webhook bounce processed for email=%s type=%s code=%s reason=%s',
-                            lead_email,
-                            cl.bounce_type or 'unknown',
-                            cl.bounce_code or 'unknown',
-                            cl.bounce_reason or 'unknown',
+                        _mark_campaign_lead_bounced(
+                            cl,
+                            now=now,
+                            bounce_type=bounce_details['bounce_type'],
+                            bounce_code=bounce_details['bounce_code'],
+                            bounce_reason=bounce_details['bounce_reason'],
                         )
                     elif event_type == 'reply':
                         cl.last_replied_at = now
